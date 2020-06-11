@@ -6,7 +6,7 @@ type App = admin.app.App;
 
 const expectedFileName = 'lineup.model.json';
 
-export const processAmiibosData = functions.storage.object()
+export const loadAmiibosOnFinalize = functions.storage.object()
   .onFinalize(async (object) => {
     if (!canProcess(object)) return;
 
