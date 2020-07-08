@@ -4,8 +4,10 @@ import * as express from 'express';
 import * as functions from 'firebase-functions';
 import { AppModule } from './app/app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { once } from 'lodash';
 
-async function initialize(instance: express.Express): Promise<void> {
+const server = express();
+const initialize = once(async (instance: express.Express) => {
   const app = await NestFactory.create(AppModule, new ExpressAdapter(instance));
 
   const options = new DocumentBuilder()
@@ -18,9 +20,8 @@ async function initialize(instance: express.Express): Promise<void> {
   SwaggerModule.setup('', app, document);
 
   await app.init();
-}
+});
 
-const server = express();
 initialize(server)
   .then(() => console.log('Api initialized.'))
   .catch((e) => console.error('Failed to initialize api.', e));
