@@ -6,7 +6,8 @@
     "experimentalDecorators": true,
     "lib": [
       "ESNext",
-      "ESNext.AsyncIterable"
+      "ESNext.AsyncIterable",
+      "DOM"
     ],
     "module": "commonjs",
     "noImplicitReturns": true,

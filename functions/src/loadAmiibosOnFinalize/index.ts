@@ -7,7 +7,7 @@ type App = admin.app.App;
 const expectedFileName = 'lineup.model.json';
 
 export const loadAmiibosOnFinalize = functions.storage.object()
-  .onFinalize(async (object) => {
+  .onFinalize(async (object: any) => {
     if (!canProcess(object)) return;
 
     const app = admin.initializeApp();
@@ -45,7 +45,7 @@ async function extractAmiiboData(app: App, object: ObjectMetadata): Promise<any>
 function processAmiiboData(amiibosData: any): Array<any> {
   const { amiiboList } = amiibosData;
   return amiiboList
-    .filter((amiibo: any) => amiibo.type === 'Figure')
+    .filter((amiibo: any) => amiibo.type === 'Figure' || amiibo.type === 'Plush')
     .map((amiibo: any) => ({
       slug: amiibo.slug,
       name: amiibo.amiiboName
