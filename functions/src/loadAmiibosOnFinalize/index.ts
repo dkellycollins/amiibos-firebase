@@ -8,7 +8,7 @@ const expectedFileName = 'lineup.model.json';
 
 export const loadAmiibosOnFinalize = functions.storage.object()
   .onFinalize(async (object: any) => {
-    if (!canProcess(object)) return;
+    if (!canProcessObject(object)) return;
 
     const app = admin.initializeApp();
     const amiibosData = await extractAmiiboData(app, object);
@@ -16,7 +16,7 @@ export const loadAmiibosOnFinalize = functions.storage.object()
     await loadAmiibos(app, amiibos);
   });
 
-function canProcess(object: ObjectMetadata): boolean {
+function canProcessObject(object: ObjectMetadata): boolean {
   if (!object.name) {
     console.warn(`Undefined name for object.`);
     return false;
@@ -44,9 +44,18 @@ async function extractAmiiboData(app: App, object: ObjectMetadata): Promise<any>
 
 function processAmiiboData(amiibosData: any): Array<any> {
   const { amiiboList } = amiibosData;
+
+  const canProcessAmiiboData = (amiibo: any) => amiibo.type === 'Figure' || amiibo.type === 'Plush';
+
+  const skippedAmiibos = amiiboList
+    .filter((amiibo: any) => !canProcessAmiiboData(amiibo))
+    .map((amiibo: any) => amiibo.slug);
+  console.log(`Skipping ${skippedAmiibos.length} amiibos; ${JSON.stringify(skippedAmiibos)}`);
+
   return amiiboList
-    .filter((amiibo: any) => amiibo.type === 'Figure' || amiibo.type === 'Plush')
+    .filter(canProcessAmiiboData)
     .map((amiibo: any) => ({
+      type: 'figure',
       slug: amiibo.slug,
       name: amiibo.amiiboName
         .replace('&#8482;', '')
@@ -60,20 +69,23 @@ function processAmiiboData(amiibosData: any): Array<any> {
 }
 
 async function loadAmiibos(app: App, amiibos: Array<any>): Promise<void> {
+  console.log(`Loading ${amiibos.length} amiibos...`);
+
   const amiibosCollection = app
     .firestore()
     .collection('amiibos');
-  await Promise.all(amiibos.map(async amiibo => {
-    console.log(`Adding Amiibo "${amiibo.slug}...`);
+  const results = await Promise.all(amiibos.map(async amiibo => {
     try {
       await amiibosCollection
         .doc(amiibo.slug)
         .set(amiibo);
-      console.log(`Added Amiibo "${amiibo.slug}".`);
+      return true;
     }
     catch (error) {
       console.log(`Failed to load Amiibo "${amiibo.id}."`);
-      throw error;
+      return false;
     }
   }));
+
+  console.log(`Successfully loaded ${results.filter(result => result).length} out of ${amiibos.length} amiibos.`);
 }

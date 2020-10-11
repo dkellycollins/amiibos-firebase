@@ -5,20 +5,21 @@ import * as functions from 'firebase-functions';
 import { AppModule } from './app/app.module';
 import { once } from 'lodash';
 
-const server = express();
+const initialize = once(async () => {
+  const server = express();
+  const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
+  await app.init();
 
-const initialize = once(async (instance: express.Express) => {
-  try {
-    const app = await NestFactory.create(AppModule, new ExpressAdapter(instance));
-    await app.init();
-    console.log('GraphQL initialized.');
-  }
-  catch (e) {
-    console.error('Failed to initialize GraphQL.', e);
-  }
+  return server;
 });
 
-export const graphql = functions.https.onRequest(async (req, resp) => {
-  await initialize(server);
-  server(req, resp);
+export const graphql = functions.https.onRequest((req, resp) => {
+  initialize()
+    .then(server => {
+      server(req, resp);
+    })
+    .catch(e => {
+      console.error(e);
+      resp.status(500).send();
+    });
 });

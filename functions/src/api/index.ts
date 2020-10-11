@@ -6,9 +6,9 @@ import { AppModule } from './app/app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { once } from 'lodash';
 
-const server = express();
-const initialize = once(async (instance: express.Express) => {
-  const app = await NestFactory.create(AppModule, new ExpressAdapter(instance));
+const initialize = once(async () => {
+  const server = express();
+  const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
 
   const options = new DocumentBuilder()
     .setTitle('Amiibos API')
@@ -20,10 +20,18 @@ const initialize = once(async (instance: express.Express) => {
   SwaggerModule.setup('', app, document);
 
   await app.init();
+  console.log('Api initialized.');
+
+  return server;
 });
 
-initialize(server)
-  .then(() => console.log('Api initialized.'))
-  .catch((e) => console.error('Failed to initialize api.', e));
-
-export const api = functions.https.onRequest(server);
+export const api = functions.https.onRequest((req, resp) => {
+  initialize()
+    .then((server) => {
+      server(req, resp);
+    })
+    .catch((e) => {
+      console.error(e);
+      resp.status(500).send();
+    });
+});
