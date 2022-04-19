@@ -82,7 +82,7 @@ async function saveImages(app: App, amiibos: Array<Amiibo>): Promise<void> {
   console.log(`Processing images for ${amiibos.length} amiibos...`);
 
   const bucket = app.storage().bucket();
-  let savedImageCount = 0;
+  let savedImages = [];
 
   for (const amiibo of amiibos) {
     try {
@@ -90,7 +90,7 @@ async function saveImages(app: App, amiibos: Array<Amiibo>): Promise<void> {
       const [exists] = await bucket.file(dest).exists(); 
       if (!exists) {
         await saveImage(bucket, amiibo.figureUrl, dest);
-        savedImageCount++;
+        savedImages.push(amiibo.figureUrl);
       }
     }
     catch (error) {
@@ -99,13 +99,12 @@ async function saveImages(app: App, amiibos: Array<Amiibo>): Promise<void> {
     }
   }
 
-  console.log(`Saved ${savedImageCount} images.`);
+  console.log(`Saved ${savedImages.length} images: [${savedImages.join(', ')}]`);
 }
 
 async function saveImage(bucket: Bucket, src: string, dest: string): Promise<string> {
   const tempFilePath = path.join(os.tmpdir(), dest);
 
-  console.log(`Downloading image "${src}"...`)
   const tempFile = fs.createWriteStream(tempFilePath);
   await new Promise((resolve, reject) => {
     const client = src.startsWith('https') ? https : http;
