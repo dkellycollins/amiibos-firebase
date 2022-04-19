@@ -3,6 +3,7 @@ import * as functions from 'firebase-functions';
 import { ObjectMetadata } from 'firebase-functions/lib/providers/storage';
 import * as fs from 'fs';
 import * as http from 'http';
+import * as https from 'https';
 import * as os from 'os';
 import * as path from 'path';
 import { Amiibo } from './Amiibo';
@@ -83,8 +84,7 @@ async function saveImages(app: App, amiibos: Array<Amiibo>): Promise<void> {
   const bucket = app.storage().bucket();
   let savedImageCount = 0;
 
-  for (let i = 0; i < amiibos.length; i++) {
-    const amiibo = amiibos[i];
+  for (const amiibo of amiibos) {
     try {
       const dest = `amiibos/${amiibo.slug}/figure`;
       const [exists] = await bucket.file(dest).exists(); 
@@ -108,7 +108,8 @@ async function saveImage(bucket: Bucket, src: string, dest: string): Promise<str
   console.log(`Downloading image "${src}"...`)
   const tempFile = fs.createWriteStream(tempFilePath);
   await new Promise((resolve, reject) => {
-    const request = http.get(src, (response) => {
+    const client = src.startsWith('https') ? https : http;
+    const request = client.get(src, (response) => {
       response.pipe(tempFile);
       tempFile.on('finish', () => {
         tempFile.close();
