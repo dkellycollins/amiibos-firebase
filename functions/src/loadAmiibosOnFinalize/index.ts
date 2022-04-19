@@ -1,8 +1,15 @@
-import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import * as functions from 'firebase-functions';
 import { ObjectMetadata } from 'firebase-functions/lib/providers/storage';
+import fs from 'fs';
+import http from 'http';
+import * as os from 'os';
+import * as path from 'path';
+import { Amiibo } from './Amiibo';
+import { AmiiboListItem } from './AmiiboListItem';
 
 type App = admin.app.App;
+type Bucket = ReturnType<admin.storage.Storage['bucket']>
 
 const expectedFileName = 'lineup.model.json';
 
@@ -13,6 +20,8 @@ export const loadAmiibosOnFinalize = functions.storage.object()
     const app = admin.initializeApp();
     const amiibosData = await extractAmiiboData(app, object);
     const amiibos = processAmiiboData(amiibosData);
+
+    await saveImages(app, amiibos);
     await loadAmiibos(app, amiibos);
   });
 
@@ -45,7 +54,7 @@ async function extractAmiiboData(app: App, object: ObjectMetadata): Promise<any>
 function processAmiiboData(amiibosData: any): Array<any> {
   const { amiiboList } = amiibosData;
 
-  const canProcessAmiiboData = (amiibo: any) => amiibo.type === 'Figure' || amiibo.type === 'Plush';
+  const canProcessAmiiboData = (amiiboData: any) => amiiboData.type === 'Figure' || amiiboData.type === 'Plush';
 
   const skippedAmiibos = amiiboList
     .filter((amiibo: any) => !canProcessAmiiboData(amiibo))
@@ -54,7 +63,7 @@ function processAmiiboData(amiibosData: any): Array<any> {
 
   return amiiboList
     .filter(canProcessAmiiboData)
-    .map((amiibo: any) => ({
+    .map((amiibo: AmiiboListItem): Amiibo => ({
       type: 'figure',
       slug: amiibo.slug,
       name: amiibo.amiiboName
@@ -62,15 +71,65 @@ function processAmiiboData(amiibosData: any): Array<any> {
         .replace('&#174;', ''),
       description: amiibo.overviewDescription,
       series: amiibo.series,
-      figureUrl: `https://www.nintendo.com/${amiibo.figureURL}`,
+      figureUrl: amiibo.figureURL,
       releaseDate: amiibo.releaseDateMask
     }))
     .sort((a: any, b: any) => a.name.localeCompare(b.name));
 }
 
-async function loadAmiibos(app: App, amiibos: Array<any>): Promise<void> {
+async function saveImages(app: App, amiibos: Array<Amiibo>): Promise<void> {
+  console.log(`Processing images for ${amiibos.length} amiibos...`);
+
+  const bucket = app.storage().bucket();
+  let savedImageCount = 0;
+
+  for (let i = 0; i < amiibos.length; i++) {
+    const amiibo = amiibos[i];
+    try {
+      const dest = `amiibos/${amiibo.slug}/figure`;
+      if (!(await bucket.file(dest).exists())) {
+        await saveImage(bucket, amiibo.figureUrl, dest);
+        savedImageCount++;
+      }
+    }
+    catch (error) {
+      console.error(`Failed to save image for amiibo ${amiibo.slug}...`);
+      console.error(error);
+    }
+  }
+
+  console.log(`Saved ${savedImageCount} images.`);
+}
+
+async function saveImage(bucket: Bucket, src: string, dest: string): Promise<string> {
+  const tempFilePath = path.join(os.tmpdir(), dest);
+
+  console.log(`Downloading image "${src}"...`)
+  const tempFile = fs.createWriteStream(tempFilePath);
+  await new Promise((resolve, reject) => {
+    const request = http.get(src, (response) => {
+      response.pipe(tempFile);
+      tempFile.on('finish', () => {
+        tempFile.close();
+        resolve(undefined);
+      });
+    });
+    request.on('error', reject);
+  });
+
+  try {
+    await bucket.upload(tempFilePath, { destination: dest });
+  }
+  finally {
+    await new Promise(resolve => fs.unlink(tempFilePath, resolve));
+  }
+  return `${bucket.baseUrl}/${dest}`;
+}
+
+async function loadAmiibos(app: App, amiibos: Array<Amiibo>): Promise<void> {
   console.log(`Loading ${amiibos.length} amiibos...`);
 
+  const bucket = app.storage().bucket();
   const amiibosCollection = app
     .firestore()
     .collection('amiibos');
@@ -78,11 +137,14 @@ async function loadAmiibos(app: App, amiibos: Array<any>): Promise<void> {
     try {
       await amiibosCollection
         .doc(amiibo.slug)
-        .set(amiibo);
+        .set({
+          ...amiibo,
+          figureUrl: `${bucket.baseUrl}/amiibos/${amiibo.slug}/figure`
+        });
       return true;
     }
     catch (error) {
-      console.log(`Failed to load Amiibo "${amiibo.id}."`);
+      console.log(`Failed to load Amiibo "${amiibo.slug}."`);
       return false;
     }
   }));
