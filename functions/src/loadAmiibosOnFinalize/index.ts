@@ -1,8 +1,8 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { ObjectMetadata } from 'firebase-functions/lib/providers/storage';
-import fs from 'fs';
-import http from 'http';
+import * as fs from 'fs';
+import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
 import { Amiibo } from './Amiibo';
