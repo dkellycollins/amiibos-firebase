@@ -87,7 +87,8 @@ async function saveImages(app: App, amiibos: Array<Amiibo>): Promise<void> {
     const amiibo = amiibos[i];
     try {
       const dest = `amiibos/${amiibo.slug}/figure`;
-      if (!(await bucket.file(dest).exists())) {
+      const [exists] = await bucket.file(dest).exists(); 
+      if (!exists) {
         await saveImage(bucket, amiibo.figureUrl, dest);
         savedImageCount++;
       }
@@ -139,7 +140,11 @@ async function loadAmiibos(app: App, amiibos: Array<Amiibo>): Promise<void> {
         .doc(amiibo.slug)
         .set({
           ...amiibo,
-          figureUrl: `${bucket.baseUrl}/amiibos/${amiibo.slug}/figure`
+          figureUrl: await bucket.file(`amiibos/${amiibo.slug}/figure`)
+            .getSignedUrl({
+              action: 'read',
+              expires: '03-09-2491'
+            })
         });
       return true;
     }
