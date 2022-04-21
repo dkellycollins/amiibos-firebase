@@ -39,6 +39,10 @@ function canProcessObject(object: ObjectMetadata): boolean {
   return true;
 }
 
+function canProcessAmiibo(amiiboData: any): amiiboData is AmiiboListItem {
+  return  amiiboData.type === 'Figure' || amiiboData.type === 'Plush';
+}
+
 async function extractAmiiboData(app: App, object: ObjectMetadata): Promise<any> {
   if (!object.name) {
     throw new Error(`Undefined name for object.`);
@@ -55,15 +59,13 @@ async function extractAmiiboData(app: App, object: ObjectMetadata): Promise<any>
 function processAmiiboData(amiibosData: any): Array<any> {
   const { amiiboList } = amiibosData;
 
-  const canProcessAmiiboData = (amiiboData: any) => amiiboData.type === 'Figure' || amiiboData.type === 'Plush';
-
   const skippedAmiibos = amiiboList
-    .filter((amiibo: any) => !canProcessAmiiboData(amiibo))
+    .filter((amiibo: any) => !canProcessAmiibo(amiibo))
     .map((amiibo: any) => amiibo.slug);
   console.log(`Skipping ${skippedAmiibos.length} amiibos; ${JSON.stringify(skippedAmiibos)}`);
 
   return amiiboList
-    .filter(canProcessAmiiboData)
+    .filter(canProcessAmiibo)
     .map((amiibo: AmiiboListItem): Amiibo => ({
       type: 'figure',
       slug: amiibo.slug,
@@ -82,7 +84,7 @@ async function saveImages(app: App, amiibos: Array<Amiibo>): Promise<void> {
   console.log(`Processing images for ${amiibos.length} amiibos...`);
 
   const bucket = app.storage().bucket();
-  let savedImages = [];
+  const savedImages = [];
 
   for (const amiibo of amiibos) {
     try {
@@ -94,7 +96,7 @@ async function saveImages(app: App, amiibos: Array<Amiibo>): Promise<void> {
       }
     }
     catch (error) {
-      console.error(`Failed to save image for amiibo ${amiibo.slug}...`);
+      console.error(`Failed to save image for amiibo ${amiibo.slug}.`);
       console.error(error);
     }
   }
@@ -103,23 +105,37 @@ async function saveImages(app: App, amiibos: Array<Amiibo>): Promise<void> {
 }
 
 async function saveImage(bucket: Bucket, src: string, dest: string): Promise<string> {
-  const tempFilePath = path.join(os.tmpdir(), dest);
-
-  const tempFile = fs.createWriteStream(tempFilePath);
-  await new Promise((resolve, reject) => {
+  console.log(`Downloading image "${src}"`);
+  const [tempFilePath, contentType] = await new Promise((resolve, reject) => {
     const client = src.startsWith('https') ? https : http;
-    const request = client.get(src, (response) => {
-      response.pipe(tempFile);
-      tempFile.on('finish', () => {
-        tempFile.close();
-        resolve(undefined);
-      });
-    });
-    request.on('error', reject);
+    client
+      .get(src, response => {
+        const statusCode = response.statusCode || 0;
+        if (statusCode < 200 || statusCode >= 300) {
+          reject(new Error(`Request failed with status code ${statusCode}`));
+          return;
+        }
+
+        const _contentType = response.headers['content-type'];
+        const _tempFilePath = path.join(os.tmpdir(), dest);
+        const tempFile = fs.createWriteStream(_tempFilePath, {
+          autoClose: true
+        });
+        response
+          .pipe(tempFile)
+          .on('finish', () => resolve([_tempFilePath, _contentType]))
+          .on('error', reject);
+      })
+      .on('error', reject);
   });
 
+  console.log(`Uploading image "${tempFilePath}" to "${dest}"`);
   try {
-    await bucket.upload(tempFilePath, { destination: dest });
+    await bucket.upload(tempFilePath, { 
+      destination: dest, 
+      public: true, 
+      contentType: contentType 
+    });
   }
   finally {
     await new Promise(resolve => fs.unlink(tempFilePath, resolve));
