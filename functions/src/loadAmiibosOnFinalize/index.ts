@@ -1,11 +1,8 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { ObjectMetadata } from 'firebase-functions/lib/providers/storage';
-import * as fs from 'fs';
 import * as http from 'http';
 import * as https from 'https';
-import * as os from 'os';
-import * as path from 'path';
 import { Amiibo } from './Amiibo';
 import { AmiiboListItem } from './AmiiboListItem';
 
@@ -104,9 +101,8 @@ async function saveImages(app: App, amiibos: Array<Amiibo>): Promise<void> {
   console.log(`Saved ${savedImages.length} images: [${savedImages.join(', ')}]`);
 }
 
-async function saveImage(bucket: Bucket, src: string, dest: string): Promise<string> {
-  console.log(`Downloading image "${src}"`);
-  const [tempFilePath, contentType] = await new Promise((resolve, reject) => {
+async function saveImage(bucket: Bucket, src: string, dest: string): Promise<void> {
+  await new Promise((resolve, reject) => {
     const client = src.startsWith('https') ? https : http;
     client
       .get(src, response => {
@@ -117,30 +113,19 @@ async function saveImage(bucket: Bucket, src: string, dest: string): Promise<str
         }
 
         const _contentType = response.headers['content-type'];
-        const _tempFilePath = path.join(os.tmpdir(), dest);
-        const tempFile = fs.createWriteStream(_tempFilePath, {
-          autoClose: true
-        });
+        const fileStream = bucket
+          .file(dest)
+          .createWriteStream({
+            public: true,
+            contentType: _contentType
+          }); 
         response
-          .pipe(tempFile)
-          .on('finish', () => resolve([_tempFilePath, _contentType]))
+          .pipe(fileStream)
+          .on('finish', resolve)
           .on('error', reject);
       })
       .on('error', reject);
   });
-
-  console.log(`Uploading image "${tempFilePath}" to "${dest}"`);
-  try {
-    await bucket.upload(tempFilePath, { 
-      destination: dest, 
-      public: true, 
-      contentType: contentType 
-    });
-  }
-  finally {
-    await new Promise(resolve => fs.unlink(tempFilePath, resolve));
-  }
-  return `${bucket.baseUrl}/${dest}`;
 }
 
 async function loadAmiibos(app: App, amiibos: Array<Amiibo>): Promise<void> {
@@ -156,11 +141,7 @@ async function loadAmiibos(app: App, amiibos: Array<Amiibo>): Promise<void> {
         .doc(amiibo.slug)
         .set({
           ...amiibo,
-          figureUrl: await bucket.file(`amiibos/${amiibo.slug}/figure`)
-            .getSignedUrl({
-              action: 'read',
-              expires: '03-09-2491'
-            })
+          figureUrl: `https://storage.googleapis.com/${bucket.name}/amiibos/${amiibo.slug}/figure`
         });
       return true;
     }
