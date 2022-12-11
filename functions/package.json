@@ -22,7 +22,7 @@
     "apollo-server-express": "^2.14.3",
     "class-transformer": "^0.2.3",
     "class-validator": "^0.12.2",
-    "express": "^4.17.1",
+    "express": "^4.17.3",
     "firebase-admin": "^8.0.0",
     "firebase-functions": "^3.1.0",
     "graphql": "^14.6.0",
