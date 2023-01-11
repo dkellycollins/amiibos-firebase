@@ -21,7 +21,7 @@
     "@nestjs/swagger": "^4.5.10",
     "apollo-server-express": "^2.14.3",
     "class-transformer": "^0.2.3",
-    "class-validator": "^0.12.2",
+    "class-validator": "^0.14.0",
     "express": "^4.17.1",
     "firebase-admin": "^8.0.0",
     "firebase-functions": "^3.1.0",
