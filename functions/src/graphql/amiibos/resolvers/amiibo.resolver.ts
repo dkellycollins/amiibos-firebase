@@ -13,7 +13,8 @@ export class AmiiboResolver {
   @Query(() => [AmiiboObject])
   public async amiibos(@Args() args: AmiibosArgs): Promise<Array<AmiiboObject>> {
     return await this.amiibosService.list({
-      series: args.series
+      series: args.series,
+      type: args.type
     });
   }
 

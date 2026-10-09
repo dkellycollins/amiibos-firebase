@@ -1,3 +1,4 @@
 export * from './api';
 export * from './graphql';
-export * from './loadAmiibosOnFinalize';
+export * from './syncAmiibosFromAmiiboApi';
+export * from './syncAmiibosFromNintendo';

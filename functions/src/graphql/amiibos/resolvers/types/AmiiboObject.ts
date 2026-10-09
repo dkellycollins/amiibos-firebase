@@ -9,6 +9,12 @@ export class AmiiboObject {
   public slug: string;
 
   /**
+   * The kind of Amiibo, either "figure" or "card".
+   */
+  @Field()
+  public type: string;
+
+  /**
    * Display name for the Amiibo figure.
    */
   @Field()
@@ -38,8 +44,9 @@ export class AmiiboObject {
   @Field()
   public releaseDate: string;
 
-  constructor(slug: string, name: string, description: string, series: string, figureUrl: string, releaseDate: string) {
+  constructor(slug: string, type: string, name: string, description: string, series: string, figureUrl: string, releaseDate: string) {
     this.slug = slug;
+    this.type = type;
     this.name = name;
     this.description = description;
     this.series = series;

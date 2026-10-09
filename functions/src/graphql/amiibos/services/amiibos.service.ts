@@ -13,33 +13,23 @@ export class AmiibosService {
   ) { }
 
   public async list(args: ListAmiibosArgs): Promise<Array<AmiiboModel>> {
-    const snapshotPromise = !!args.series
-      ? this.getAmiibosCollection().where('series', '==', args.series).get()
-      : this.getAmiibosCollection().get();
-    const snapshot = await snapshotPromise;
+    let query: admin.firestore.Query = this.getAmiibosCollection();
+    if (args.series) {
+      query = query.where('series', '==', args.series);
+    }
+    if (args.type) {
+      query = query.where('type', '==', args.type);
+    }
+    const snapshot = await query.get();
 
     return snapshot.docs.map(doc => {
-      return {
-        slug: doc.get('slug'),
-        name: doc.get('name'),
-        description: doc.get('description'),
-        series: doc.get('series'),
-        figureUrl: doc.get('figureUrl'),
-        releaseDate: doc.get('releaseDate')
-      };
+      return this.toAmiiboModel(doc);
     });
   }
 
   public async get(slug: string): Promise<AmiiboModel> {
     const doc = await this.getAmiibosCollection().doc(slug).get();
-    return {
-      slug: doc.get('slug'),
-      name: doc.get('name'),
-      description: doc.get('description'),
-      series: doc.get('series'),
-      figureUrl: doc.get('figureUrl'),
-      releaseDate: doc.get('releaseDate')
-    };
+    return this.toAmiiboModel(doc);
   }
 
   public async getSeries(): Promise<Array<string>> {
@@ -53,6 +43,18 @@ export class AmiibosService {
       .filter((value, index, array) => array.indexOf(value) === index);
   }
 
+  private toAmiiboModel(doc: admin.firestore.DocumentSnapshot): AmiiboModel {
+    return {
+      slug: doc.get('slug'),
+      type: doc.get('type') || 'figure',
+      name: doc.get('name'),
+      description: doc.get('description'),
+      series: doc.get('series'),
+      figureUrl: doc.get('figureUrl'),
+      releaseDate: doc.get('releaseDate')
+    };
+  }
+
   private getAmiibosCollection(): admin.firestore.CollectionReference {
     return this.firestore.collection('amiibos');
   }
@@ -60,4 +62,5 @@ export class AmiibosService {
 
 export interface ListAmiibosArgs {
   series?: string;
+  type?: string;
 }

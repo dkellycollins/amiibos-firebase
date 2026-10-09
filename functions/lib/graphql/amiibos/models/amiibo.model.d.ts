@@ -1,4 +1,5 @@
 export interface AmiiboModel {
+    type: string;
     slug: string;
     name: string;
     description: string;
