@@ -9,6 +9,9 @@ firebase-debug.log*
 # Firebase cache
 .firebase/
 
+# Service account keys (used by the scripts in functions/src/scripts)
+*-firebase-adminsdk-*.json
+
 # Firebase config
 
 # Uncomment this if you'd like others to create their own Firebase project.

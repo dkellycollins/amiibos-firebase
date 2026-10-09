@@ -2,12 +2,12 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { Amiibo } from './Amiibo';
 import { getFirebaseApp } from './firebaseApp';
 
-const COLLECTION_NAME = 'amiibos';
+export const COLLECTION_NAME = 'amiibos';
 
 /**
  * Firestore allows at most 500 writes per batch.
  */
-const MAX_BATCH_SIZE = 500;
+export const MAX_BATCH_SIZE = 500;
 
 /**
  * A document already stored in the collection. Older documents may be missing newer fields
