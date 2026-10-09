@@ -49,6 +49,7 @@ export function createSyncFunction(name: string, operation: SyncOperation): func
         response.status(200).json({
           dryRun,
           amiibos: result.amiibos.length,
+          saved: getSavedCount(result.amiibos, images),
           images,
           ...result.details,
         });
@@ -71,6 +72,17 @@ async function persist(amiibos: Array<Amiibo>, dryRun: boolean): Promise<ImageCo
   await saveAmiibos(stored.amiibos);
 
   return stored.summary;
+}
+
+/**
+ * Amiibos whose image could not be stored are not saved.
+ */
+function getSavedCount(amiibos: Array<Amiibo>, images: ImageCopySummary | null): number {
+  if (!images) {
+    return 0;
+  }
+
+  return amiibos.length - images.failed.length;
 }
 
 function toErrorMessage(error: unknown): string {

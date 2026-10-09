@@ -131,8 +131,9 @@ Firestore or Storage.
 
 - `set(doc, { merge: true })` in batches of up to 500. Nothing is ever deleted.
 - Images are stored at `amiibos/<slug>/figure` (public), the same as before. Existing files
-  are not downloaded again. If an image fails to copy, `figureUrl` falls back to the
-  source URL.
+  are not downloaded again. `figureUrl` always points at Firebase Storage, never at the
+  source. If an image fails to copy, that amiibo is not written, and the next run tries it
+  again.
 
 ### Remove `loadAmiibosOnFinalize`
 

@@ -23,7 +23,9 @@ export interface ImageCopySummary {
  * Copies each amiibo's figure image into the default storage bucket (if it is not already there)
  * and returns the amiibos with `figureUrl` pointing at the stored copy.
  *
- * When an image cannot be copied the amiibo keeps its original source url.
+ * Amiibos whose image cannot be stored are left out of the result (and listed in
+ * `summary.failed`) so that no document references an external image url. They are retried the
+ * next time the sync runs.
  */
 export async function storeFigureImages(amiibos: Array<Amiibo>): Promise<{
   amiibos: Array<Amiibo>;
@@ -35,23 +37,28 @@ export async function storeFigureImages(amiibos: Array<Amiibo>): Promise<{
     alreadyStored: 0,
     failed: [],
   };
-  const updatedAmiibos: Array<Amiibo> = [];
+  const storedAmiibos: Array<Amiibo> = [];
 
   for (let start = 0; start < amiibos.length; start += IMAGE_CONCURRENCY) {
     const chunk = amiibos.slice(start, start + IMAGE_CONCURRENCY);
-    const updatedChunk = await Promise.all(chunk.map(async amiibo => {
+    const storedChunk = await Promise.all(chunk.map(async amiibo => {
       return await storeFigureImage(bucket, amiibo, summary);
     }));
-    updatedAmiibos.push(...updatedChunk);
+
+    for (const storedAmiibo of storedChunk) {
+      if (storedAmiibo) {
+        storedAmiibos.push(storedAmiibo);
+      }
+    }
   }
 
   console.log(`Images: ${summary.copied} copied, ${summary.alreadyStored} already stored, ${summary.failed.length} failed.`);
   if (summary.failed.length > 0) {
-    console.warn(`Failed to copy images for: ${summary.failed.join(', ')}`);
+    console.warn(`Not saving amiibos whose image could not be stored: ${summary.failed.join(', ')}`);
   }
 
   return {
-    amiibos: updatedAmiibos,
+    amiibos: storedAmiibos,
     summary,
   };
 }
@@ -60,7 +67,11 @@ export async function storeFigureImages(amiibos: Array<Amiibo>): Promise<{
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function storeFigureImage(bucket: Bucket, amiibo: Amiibo, summary: ImageCopySummary): Promise<Amiibo> {
+/**
+ * Returns the amiibo with `figureUrl` pointing at the stored image, or null when the image could
+ * not be stored.
+ */
+async function storeFigureImage(bucket: Bucket, amiibo: Amiibo, summary: ImageCopySummary): Promise<Amiibo | null> {
   const destination = `amiibos/${amiibo.slug}/figure`;
   const storedUrl = `https://storage.googleapis.com/${bucket.name}/${destination}`;
 
@@ -84,7 +95,7 @@ async function storeFigureImage(bucket: Bucket, amiibo: Amiibo, summary: ImageCo
   catch (error) {
     console.error(`Failed to copy image for amiibo "${amiibo.slug}" from ${amiibo.figureUrl}.`, error);
     summary.failed.push(amiibo.slug);
-    return amiibo;
+    return null;
   }
 }
 
